@@ -10,7 +10,7 @@ import BillingMatrix from './components/BillingMatrix';
 import ControlMatrix from './components/ControlMatrix';
 
 import {
-  FileCheck2, SlidersHorizontal, Table, LineChart, Cpu, Calendar, Database, 
+  FileCheck2, SlidersHorizontal, Table, LineChart, Cpu, Calendar, Database,
   HelpCircle, RefreshCw, Layers, ArrowUpRight, ShieldCheck, Mail, Receipt,
   Sun, Moon, Printer, ShieldAlert
 } from 'lucide-react';
@@ -25,6 +25,10 @@ const INITIAL_FILTERS: DashboardFilters = {
   newProposalStatus: 'All'
 };
 
+// Security Passcode Gate to protect public access on GitHub Pages.
+// To turn off the password requirement, simply set this to an empty string ''.
+const SECURITY_PASSCODE = 'KYN-ELS-2026';
+
 export default function App() {
   const [contracts, setContracts] = useState<Contract[]>([]);
   const [sourceName, setSourceName] = useState('Default KYN Shed Records');
@@ -34,6 +38,25 @@ export default function App() {
   const [showSyncPanel, setShowSyncPanel] = useState(false);
   const [darkMode, setDarkMode] = useState(() => localStorage.getItem('kyn_dark_mode') === 'true');
   const [showPrintNotice, setShowPrintNotice] = useState(false);
+
+  // Passcode gate state
+  const [passcodeAttempt, setPasscodeAttempt] = useState('');
+  const [passcodeError, setPasscodeError] = useState(false);
+  const [isUnlocked, setIsUnlocked] = useState(() => {
+    if (!SECURITY_PASSCODE) return true;
+    return sessionStorage.getItem('kyn_unlocked') === 'true';
+  });
+
+  const handlePasscodeSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (passcodeAttempt === SECURITY_PASSCODE) {
+      sessionStorage.setItem('kyn_unlocked', 'true');
+      setIsUnlocked(true);
+      setPasscodeError(false);
+    } else {
+      setPasscodeError(true);
+    }
+  };
 
   useEffect(() => {
     if (darkMode) {
@@ -60,7 +83,7 @@ export default function App() {
     try {
       const storedData = localStorage.getItem('kyn_contracts_data');
       const storedSource = localStorage.getItem('kyn_contracts_source');
-      
+
       if (storedData) {
         const parsed: Contract[] = JSON.parse(storedData);
         // Refresh classifications to prevent cached stale/duplicate types
@@ -135,9 +158,64 @@ export default function App() {
     setFilters(INITIAL_FILTERS);
   };
 
+  if (!isUnlocked && SECURITY_PASSCODE) {
+    return (
+      <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4 font-sans select-none relative overflow-hidden dark">
+        {/* Abstract background decorative blobs */}
+        <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-teal-500/10 rounded-full blur-3xl animate-pulse" />
+        <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-indigo-500/10 rounded-full blur-3xl" />
+
+        <div className="relative w-full max-w-md bg-slate-900/60 p-8 rounded-3xl border border-slate-800 shadow-2xl backdrop-blur-xl text-center">
+          <div className="mx-auto w-14 h-14 bg-red-500/15 border border-red-500/30 text-red-400 rounded-2xl flex items-center justify-center mb-6 shadow-inner">
+            <ShieldAlert className="w-7 h-7 animate-pulse" />
+          </div>
+
+          <h1 className="text-xl font-bold tracking-tight text-white font-sans">Central Railway • ELS/KYN</h1>
+          <p className="text-[10px] text-teal-400 font-mono tracking-widest uppercase mt-1">Contracts Controller Gate</p>
+
+          <p className="text-xs text-slate-400 mt-4 leading-relaxed px-2">
+            This dashboard contains sensitive contractor schedules and live financial liabilities. Enter the secure controller passcode to initialize the monitoring system.
+          </p>
+
+          <form onSubmit={handlePasscodeSubmit} className="mt-8 space-y-4">
+            <div>
+              <input
+                type="password"
+                required
+                value={passcodeAttempt}
+                onChange={(e) => {
+                  setPasscodeAttempt(e.target.value);
+                  setPasscodeError(false);
+                }}
+                placeholder="Enter Site Passcode..."
+                className="w-full text-center py-3 px-4 bg-slate-950/80 border border-slate-800 focus:border-teal-500/60 text-white placeholder-slate-600 rounded-xl outline-none text-xs font-mono tracking-wider focus:ring-2 focus:ring-teal-500/25 transition-all shadow-inner"
+              />
+              {passcodeError && (
+                <p className="text-red-400 text-[10px] font-semibold font-mono mt-2 animate-bounce">
+                  ❌ Incorrect passcode. Verification failed.
+                </p>
+              )}
+            </div>
+
+            <button
+              type="submit"
+              className="w-full bg-teal-600 hover:bg-teal-500 text-white font-bold py-3 px-4 rounded-xl text-xs transition-all shadow-md active:scale-98 cursor-pointer"
+            >
+              Initialize Controller Platform
+            </button>
+          </form>
+
+          <div className="mt-8 pt-6 border-t border-slate-850 flex items-center justify-center gap-1.5 text-[9px] text-slate-500 font-mono">
+            <span>Static client-side sandbox privacy protocol</span>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-850 dark:text-slate-100 transition-all font-sans antialiased text-xs selection:bg-teal-150 selection:text-teal-900">
-      
+
       {/* Top Professional Executive Banner */}
       <header className="bg-slate-900 text-white shadow-md border-b border-slate-800 no-print">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5">
@@ -217,8 +295,8 @@ export default function App() {
                 ℹ️ <strong>Heads up:</strong> Since this app runs in a sandboxed preview frame, some web browsers block print dialog commands from triggering inside the frame, or truncate content.
                 For a perfect, full-width, clean vector PDF printout, please click the <strong>"Open in new tab"</strong> button in the top-right corner of the player header first, then export there!
               </p>
-              <button 
-                onClick={() => setShowPrintNotice(false)} 
+              <button
+                onClick={() => setShowPrintNotice(false)}
                 className="text-blue-600 dark:text-blue-400 hover:underline text-[10px] font-bold cursor-pointer pt-0.5 block"
               >
                 Dismiss Notice
@@ -230,14 +308,14 @@ export default function App() {
 
       {/* Main Container Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
-        
+
         {/* Animated Google Sheets Sync Center Section */}
         {showSyncPanel && (
           <div className="animate-in fade-in slide-in-from-top-4 duration-300">
-            <SheetsSync 
-              onDataLoaded={handleDataLoaded} 
-              currentSource={sourceName} 
-              rowCount={contracts.length} 
+            <SheetsSync
+              onDataLoaded={handleDataLoaded}
+              currentSource={sourceName}
+              rowCount={contracts.length}
             />
           </div>
         )}
@@ -297,8 +375,8 @@ export default function App() {
               {filters.classificationType !== 'All' && <span className="bg-white border border-teal-200 px-2.5 py-1 rounded-lg">Type: <strong className="text-teal-955">{filters.classificationType}</strong></span>}
               {filters.workStatus !== 'All' && <span className="bg-white border border-teal-200 px-2.5 py-1 rounded-lg">Status: <strong className="text-teal-955">{filters.workStatus}</strong></span>}
             </div>
-            
-            <button 
+
+            <button
               onClick={handleClearFilters}
               className="text-xxs px-2.5 py-1 hover:bg-teal-100 rounded-lg text-teal-800 font-bold border border-teal-200 transition-colors cursor-pointer"
             >
@@ -329,7 +407,7 @@ export default function App() {
               />
             </div>
           ) : currentTab === 'billing' ? (
-            <BillingMatrix 
+            <BillingMatrix
               contracts={contracts}
               onSelectContract={setSelectedContract}
               darkMode={darkMode}
@@ -346,9 +424,9 @@ export default function App() {
       </main>
 
       {/* Slide briefings detailing popups */}
-      <ContractDetails 
-        contract={selectedContract} 
-        onClose={() => setSelectedContract(null)} 
+      <ContractDetails
+        contract={selectedContract}
+        onClose={() => setSelectedContract(null)}
       />
 
       <footer className="bg-white border-t border-slate-100 text-slate-400 py-8 text-center text-xxs font-mono mt-12">
