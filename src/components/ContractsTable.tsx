@@ -3,7 +3,7 @@ import { Contract, DashboardFilters } from '../types';
 import { 
   Search, Filter, ArrowUpDown, ChevronRight, AlertCircle, CheckCircle2, HelpCircle,
   FileSpreadsheet, Sparkles, User, UserCheck, Calendar, IndianRupee, Layers,
-  Clipboard, Check
+  Clipboard, Check, Printer, Download
 } from 'lucide-react';
 
 interface ContractsTableProps {
@@ -90,6 +90,303 @@ export default function ContractsTable({
     } catch (err) {
       console.error(err);
     }
+  };
+
+  const handleExportStyledExcel = () => {
+    try {
+      const totalValue = processedContracts.reduce((acc, c) => acc + c.totalContractValueNumeric, 0);
+      const totalCompleted = processedContracts.filter(c => c.workStatus === 'Completed').length;
+      const totalProgress = processedContracts.filter(c => c.workStatus === 'In Progress').length;
+
+      let html = `
+        <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
+        <head>
+        <!--[if gte mso 9]>
+        <xml>
+        <x:ExcelWorkbook>
+        <x:ExcelWorksheets>
+        <x:ExcelWorksheet>
+        <x:Name>Contract Register</x:Name>
+        <x:WorksheetOptions>
+        <x:DisplayGridlines/>
+        </x:WorksheetOptions>
+        </x:ExcelWorksheet>
+        </x:ExcelWorksheets>
+        </x:ExcelWorkbook>
+        </xml>
+        <![endif]-->
+        <meta charset="utf-8">
+        <style>
+          .hdr { font-family: serif; font-size: 16px; font-weight: bold; text-align: center; color: #000000; }
+          .subhdr { font-family: Arial; font-size: 11px; text-align: center; color: #555555; }
+          .title { font-family: Arial; font-size: 13px; font-weight: bold; text-align: center; background-color: #f1f5f9; padding: 10px; }
+          .meta-box { font-family: Arial; font-size: 11px; border: 1px dashed #aaaaaa; background-color: #fcfcfc; padding: 10px; }
+          .tbl-header { font-family: Arial; font-size: 11px; font-weight: bold; background-color: #0f172a; color: #ffffff; text-align: left; }
+          .tbl-header th { padding: 8px; border: 1px solid #cbd5e1; }
+          .cell { font-family: Arial; font-size: 11px; border: 1px solid #cbd5e1; padding: 6px; }
+          .cell-bold { font-family: Arial; font-size: 11px; font-weight: bold; border: 1px solid #cbd5e1; padding: 6px; }
+          .cell-mono { font-family: monospace; font-size: 11px; border: 1px solid #cbd5e1; padding: 6px; }
+          .cell-mono-bold { font-family: monospace; font-size: 11px; font-weight: bold; border: 1px solid #cbd5e1; padding: 6px; }
+        </style>
+        </head>
+        <body>
+          <table>
+            <!-- CENTRAL RAILWAY BANNER -->
+            <tr><td colspan="10" class="hdr" style="font-weight: bold; font-family: Times New Roman, serif; text-align: center; font-size: 16px;">CENTRAL RAILWAY</td></tr>
+            <tr><td colspan="10" class="subhdr" style="text-align: center; font-family: Arial, sans-serif; font-size: 11px;">OFFICE OF THE SENIOR DIVISIONAL ELECTRICAL ENGINEER (TRS)</td></tr>
+            <tr><td colspan="10" class="subhdr" style="text-align: center; font-family: Arial, sans-serif; font-size: 12px; font-weight: bold;">ELECTRIC LOCO SHED, KALYAN (MUMBAI DIVISION)</td></tr>
+            <tr><td colspan="10" style="height: 15px;"></td></tr>
+            
+            <!-- REPORT TITLE -->
+            <tr><td colspan="10" class="title" style="text-align: center; background-color: #f1f5f9; padding: 10px; font-weight: bold; font-family: Arial, sans-serif; font-size: 13px;">ELS/KYN CONTRACTS REGISTER — COHESIVE AUDIT SHEETS</td></tr>
+            <tr><td colspan="10" style="height: 10px;"></td></tr>
+            
+            <!-- REFERENCE MEMO -->
+            <tr>
+              <td colspan="10" class="meta-box" style="border: 1px dashed #aaaaaa; background-color: #fcfcfc; padding: 10px; font-family: Arial, sans-serif; font-size: 11px;">
+                <b>Export Date:</b> ${new Date().toLocaleString()} Mumbai Zone | <b>Classification:</b> HIGHLY CONFIDENTIAL (ELS/KYN Admin Only) | <b>Selected Count:</b> ${processedContracts.length} records matching filters
+              </td>
+            </tr>
+            <tr><td colspan="10" style="height: 15px;"></td></tr>
+
+            <!-- STAT CARDS -->
+            <tr style="background-color: #f8fafc; font-weight: bold;">
+              <td colspan="3" style="border: 1px solid #cbd5e1; text-align: center; padding: 12px; font-weight: bold; height: 50px;">
+                <span style="font-size: 9px; color: #475569; text-transform: uppercase; font-family: Arial, sans-serif;">Filtered Works count</span><br>
+                <span style="font-size: 14px; font-family: monospace; font-weight: bold; color: #111111;">${processedContracts.length} Works</span>
+              </td>
+              <td colspan="4" style="border: 1px solid #cbd5e1; text-align: center; padding: 12px; font-weight: bold; height: 50px;">
+                <span style="font-size: 9px; color: #475569; text-transform: uppercase; font-family: Arial, sans-serif;">Register Active Valuation</span><br>
+                <span style="font-size: 14px; font-family: monospace; font-weight: bold; color: #0d9488;">${formatIndianCurrency(totalValue)}</span>
+              </td>
+              <td colspan="3" style="border: 1px solid #cbd5e1; text-align: center; padding: 12px; font-weight: bold; height: 50px;">
+                <span style="font-size: 9px; color: #475569; text-transform: uppercase; font-family: Arial, sans-serif;">Pipeline Stat</span><br>
+                <span style="font-size: 14px; font-family: monospace; font-weight: bold; color: #3b82f6;">${totalCompleted} Comp / ${totalProgress} In Prog</span>
+              </td>
+            </tr>
+            <tr><td colspan="10" style="height: 20px;"></td></tr>
+
+            <!-- MAIN TABLE HEADERS -->
+            <tr style="background-color: #0f172a; color: #ffffff; font-weight: bold;">
+              <th style="padding: 10px; border: 1px solid #cbd5e1; text-align: center; background-color: #0f172a; color: #ffffff;">S.N</th>
+              <th style="padding: 10px; border: 1px solid #cbd5e1; text-align: left; background-color: #0f172a; color: #ffffff;">Section</th>
+              <th style="padding: 10px; border: 1px solid #cbd5e1; text-align: left; background-color: #0f172a; color: #ffffff;">Work / Contract Description</th>
+              <th style="padding: 10px; border: 1px solid #cbd5e1; text-align: left; background-color: #0f172a; color: #ffffff;">LOA Ref & Date</th>
+              <th style="padding: 10px; border: 1px solid #cbd5e1; text-align: left; background-color: #0f172a; color: #ffffff;">Executing Firm / Contractor</th>
+              <th style="padding: 10px; border: 1px solid #cbd5e1; text-align: right; background-color: #0f172a; color: #ffffff;">Valuation</th>
+              <th style="padding: 10px; border: 1px solid #cbd5e1; text-align: center; background-color: #0f172a; color: #ffffff;">Physical%</th>
+              <th style="padding: 10px; border: 1px solid #cbd5e1; text-align: center; background-color: #0f172a; color: #ffffff;">Financial%</th>
+              <th style="padding: 10px; border: 1px solid #cbd5e1; text-align: center; background-color: #0f172a; color: #ffffff;">Status</th>
+              <th style="padding: 10px; border: 1px solid #cbd5e1; text-align: left; background-color: #0f172a; color: #ffffff;">Supervisor / Remarks</th>
+            </tr>
+      `;
+
+      processedContracts.forEach((c, index) => {
+        const rowColor = (index % 2 === 0) ? '#ffffff' : '#f8fafc';
+        html += `
+          <tr style="background-color: ${rowColor};">
+            <td style="text-align: center; border: 1px solid #cbd5e1; font-family: monospace; padding: 8px;">${index + 1}</td>
+            <td style="border: 1px solid #cbd5e1; font-family: Arial, sans-serif; font-size: 11px; padding: 8px; font-weight: bold; text-align: center;">${c.section}</td>
+            <td style="border: 1px solid #cbd5e1; font-family: Arial, sans-serif; font-size: 11px; padding: 8px;"><b>${c.workName}</b></td>
+            <td style="border: 1px solid #cbd5e1; font-family: Arial, sans-serif; font-size: 11px; padding: 8px; color: #555555;">${c.loaNumberAndDate}</td>
+            <td style="border: 1px solid #cbd5e1; font-family: Arial, sans-serif; font-size: 11px; padding: 8px;">${c.firmName}</td>
+            <td style="text-align: right; border: 1px solid #cbd5e1; font-weight: bold; font-family: monospace; padding: 8px;">${c.totalContractValue}</td>
+            <td style="text-align: center; border: 1px solid #cbd5e1; font-family: monospace; padding: 8px; color: #0d9488; font-weight: bold;">${c.physicalProgress}</td>
+            <td style="text-align: center; border: 1px solid #cbd5e1; font-family: monospace; padding: 8px; color: #2563eb; font-weight: bold;">${c.financialProgress}</td>
+            <td style="text-align: center; border: 1px solid #cbd5e1; font-family: Arial, sans-serif; font-size: 11px; padding: 8px; font-weight: bold;">${c.workStatus}</td>
+            <td style="border: 1px solid #cbd5e1; font-family: Arial, sans-serif; font-size: 11px; padding: 8px;">
+              <b>Sup:</b> ${c.supervisor}<br>
+              <span style="color: #666;">${c.remarks || ''}</span>
+            </td>
+          </tr>
+        `;
+      });
+
+      html += `
+            <tr><td colspan="10" style="height: 35px;"></td></tr>
+            <!-- SIGN SIGNATORY -->
+            <tr>
+              <td colspan="5" style="font-size: 10px; color: #b91c1c; font-weight: bold; text-align: left; vertical-align: top; font-family: Arial, sans-serif;">
+                Highly Confidential Report only to be shared within ELS/KYN Administration.
+              </td>
+              <td colspan="5" style="text-align: right; font-weight: bold; font-family: Arial, sans-serif; font-size: 11px;">
+                Senior Section Engineer (Works) / SSE / ELS-KYN<br>
+                Office of Senior Divisional Electrical Engineer (TRS) Kalyan<br>
+                Central Railway
+              </td>
+            </tr>
+          </table>
+        </body>
+        </html>
+      `;
+
+      const blob = new Blob([html], { type: 'application/vnd.ms-excel;charset=utf-8' });
+      const link = document.createElement("a");
+      const filename = `ELS_KYN_Contracts_Register_${new Date().toISOString().slice(0, 10)}.xls`;
+      link.href = URL.createObjectURL(blob);
+      link.setAttribute("download", filename);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } catch (err) {
+      alert('Error exporting register Excel sheet.');
+    }
+  };
+
+  const handleExportPDFReport = () => {
+    const totalValue = processedContracts.reduce((acc, c) => acc + c.totalContractValueNumeric, 0);
+    const totalCompleted = processedContracts.filter(c => c.workStatus === 'Completed').length;
+    const totalProgress = processedContracts.filter(c => c.workStatus === 'In Progress').length;
+    const totalNotStarted = processedContracts.filter(c => c.workStatus === 'Not Started').length;
+
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) {
+      alert('Could not open print preview.');
+      return;
+    }
+
+    const rowsHtml = processedContracts.map((c, index) => {
+      const statusColor = c.workStatus === 'Completed' ? '#15803d' : c.workStatus === 'In Progress' ? '#2563eb' : '#475569';
+      return `
+        <tr>
+          <td style="text-align: center; font-family: monospace;">${index + 1}</td>
+          <td style="text-align: center; font-weight: bold;">${c.section}</td>
+          <td style="font-weight: bold; line-height: 1.2;">
+            ${c.workName}
+            <div style="font-size: 8px; color: #64748b; font-weight: normal; margin-top: 2px;">
+              LOA: ${c.loaNumberAndDate}
+            </div>
+          </td>
+          <td>${c.firmName}</td>
+          <td style="text-align: right; font-weight: bold; font-family: monospace;">${c.totalContractValue}</td>
+          <td style="text-align: center; font-family: monospace; font-size: 9px;">
+            <div style="color: #0d9488; font-weight: bold;">Phy: ${c.physicalProgress}</div>
+            <div style="color: #2563eb; font-weight: bold; margin-top: 1px;">Fin: ${c.financialProgress}</div>
+          </td>
+          <td style="text-align: center; font-weight: bold; color: ${statusColor};">${c.workStatus}</td>
+          <td style="font-size: 8.5px; color: #475569; line-height: 1.2;">
+            <strong>Sup:</strong> ${c.supervisor}<br>
+            <span>${c.remarks || '-'}</span>
+          </td>
+        </tr>
+      `;
+    }).join('');
+
+    const reportContent = `
+      <html>
+        <head>
+          <title>ELS-KYN CONTRACTS REGISTER REPORT</title>
+          <style>
+            body { font-family: Arial, sans-serif; margin: 30px; color: #0f172a; font-size: 10px; background-color: #fff; }
+            .hdr { text-align: center; font-family: "Times New Roman", Times, serif; font-size: 16px; font-weight: bold; text-transform: uppercase; margin-bottom: 2px; }
+            .subhdr { text-align: center; font-size: 10px; color: #475569; margin-bottom: 2px; letter-spacing: 0.5px; }
+            .subhdr-bold { text-align: center; font-size: 11px; font-weight: bold; margin-bottom: 12px; }
+            .divider { border-top: 1.5px solid #000; margin-bottom: 15px; }
+            .title-box { background-color: #f1f5f9; text-align: center; padding: 10px; font-weight: bold; font-size: 13px; border: 1.5px solid #cbd5e1; border-radius: 6px; margin-bottom: 15px; text-transform: uppercase; }
+            
+            .meta-section { display: flex; justify-content: space-between; border: 1px dashed #94a3b8; background-color: #f8fafc; padding: 10px; border-radius: 6px; margin-bottom: 15px; }
+            .meta-item { line-height: 1.4; }
+
+            .stats-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin-bottom: 20px; }
+            .stat-card { border: 1.5px solid #cbd5e1; border-radius: 8px; padding: 10px; text-align: center; background-color: #f8fafc; }
+            .stat-title { font-size: 8px; font-weight: bold; color: #475569; text-transform: uppercase; margin-bottom: 3px; }
+            .stat-value { font-size: 14px; font-weight: bold; font-family: monospace; color: #0f172a; }
+
+            .report-table { width: 100%; border-collapse: collapse; margin-bottom: 25px; }
+            .report-table th { background-color: #0f172a; color: #ffffff; padding: 6px 8px; font-size: 9px; font-weight: bold; text-transform: uppercase; text-align: left; border: 1px solid #cbd5e1; }
+            .report-table td { padding: 6px 8px; border: 1px solid #cbd5e1; font-size: 9px; vertical-align: top; }
+            .report-table tr:nth-child(even) { background-color: #fcfcfc; }
+
+            .footer-sig { margin-top: 30px; font-size: 9px; page-break-inside: avoid; }
+            
+            @media print {
+              body { margin: 15px; }
+              @page { size: A4 landscape; margin: 1cm; }
+            }
+          </style>
+        </head>
+        <body>
+          <div class="hdr">Central Railway</div>
+          <div class="subhdr">Office of the Senior Divisional Electrical Engineer (TRS)</div>
+          <div class="subhdr-bold">Electric Loco Shed, Kalyan (Mumbai Division)</div>
+          <div class="divider"></div>
+
+          <div class="title-box">
+            ELS/KYN CONTRACTS REGISTER — DETAILED COHESIVE AUDIT REPORT
+          </div>
+
+          <div class="meta-section">
+            <div class="meta-item">
+              <strong>Ref Status Code:</strong> ELS-KYN-REG-2026/27<br>
+              <strong>Selection Base:</strong> General Core Register Audit
+            </div>
+            <div class="meta-item" style="text-align: right;">
+              <strong>Export Date:</strong> ${new Date().toLocaleString()}<br>
+              <strong>Classification:</strong> HIGHLY CONFIDENTIAL (ELS/KYN Admin Only)
+            </div>
+          </div>
+
+          <div class="stats-row">
+            <div class="stat-card">
+              <div class="stat-title">Total Active Works matched</div>
+              <div class="stat-value" style="color: #0d9488;">${processedContracts.length} Works Records</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-title">Aggregated Portfolio Valuation</div>
+              <div class="stat-value" style="color: #0f172a;">${formatIndianCurrency(totalValue)}</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-title">Pipeline Breakdown</div>
+              <div class="stat-value" style="color: #2563eb;">${totalCompleted} Done • ${totalProgress} In Prog • ${totalNotStarted} Queued</div>
+            </div>
+          </div>
+
+          <table class="report-table">
+            <thead>
+              <tr>
+                <th style="width: 30px; text-align: center;">S.N</th>
+                <th style="width: 45px; text-align: center;">Sec</th>
+                <th>Work/Contract Name & LOA Reference</th>
+                <th style="width: 140px;">Executing Contractor</th>
+                <th style="width: 100px; text-align: right;">Valuation</th>
+                <th style="width: 85px; text-align: center;">Progress</th>
+                <th style="width: 75px; text-align: center;">Status</th>
+                <th style="width: 180px;">Supervisor / Operational Remarks</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${rowsHtml}
+            </tbody>
+          </table>
+
+          <div class="footer-sig">
+            <table style="width: 100%; border-collapse: collapse;">
+              <tr>
+                <td style="width: 50%; font-size: 10px; color: #b91c1c; font-weight: bold; vertical-align: bottom; font-family: Arial, sans-serif;">
+                  * Highly Confidential Report only to be shared within ELS/KYN Administration.
+                </td>
+                <td style="text-align: right; width: 50%;">
+                  <div style="font-weight: bold; font-size: 11px;">Central Railway • Electric Loco Shed, Kalyan</div>
+                  <div style="font-size: 10px; color: #333; margin-top: 4px; font-weight: bold;">Senior Section Engineer (Works) / SSE / ELS-KYN</div>
+                  <div style="font-size: 9px; color: #555; margin-top: 2px;">Office of Senior Divisional Electrical Engineer (TRS)</div>
+                </td>
+              </tr>
+            </table>
+          </div>
+
+          <script>
+            window.onload = function() {
+              setTimeout(function() {
+                window.print();
+              }, 500);
+            };
+          </script>
+        </body>
+      </html>
+    `;
+
+    printWindow.document.write(reportContent);
+    printWindow.document.close();
   };
 
   // Derive unique lists for filters
@@ -248,6 +545,24 @@ export default function ContractsTable({
             >
               {copiedStyled ? <Check className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 animate-bounce" /> : <Clipboard className="w-3.5 h-3.5" />}
               <span>{copiedStyled ? 'Styled Copy Ready!' : 'Copy Styled Sheets Table'}</span>
+            </button>
+
+            <button
+              onClick={handleExportStyledExcel}
+              className="p-2 px-3 text-xxs font-mono font-semibold rounded-xl flex items-center gap-1.5 cursor-pointer transition-all border bg-slate-50 border-slate-200 hover:bg-slate-100 text-slate-700 dark:bg-slate-900 dark:border-slate-800 dark:text-slate-300 dark:hover:bg-slate-800/60"
+              title="Export formatted register sheet for Excel"
+            >
+              <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+              <span>Export Styled Excel</span>
+            </button>
+
+            <button
+              onClick={handleExportPDFReport}
+              className="p-2 px-3 text-xxs font-mono font-semibold rounded-xl flex items-center gap-1.5 cursor-pointer transition-all border bg-slate-50 border-slate-200 hover:bg-slate-100 text-slate-700 dark:bg-slate-900 dark:border-slate-800 dark:text-slate-300 dark:hover:bg-slate-800/60"
+              title="Print compact, highly styled PDF Contract Register"
+            >
+              <Printer className="w-3.5 h-3.5 text-indigo-505 dark:text-indigo-400" />
+              <span>Export PDF Register</span>
             </button>
           </div>
         </div>

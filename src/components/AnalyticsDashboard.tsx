@@ -6,7 +6,7 @@ import {
 import { Contract } from '../types';
 import {
   TrendingUp, Users, AlertCircle, CheckCircle2, IndianRupee, PieChart as PieIcon,
-  BarChart4, ArrowUpRight, BarChart2, CheckSquare, Clock, ShieldAlert, Layers
+  BarChart4, ArrowUpRight, BarChart2, CheckSquare, Clock, ShieldAlert, Layers, Printer
 } from 'lucide-react';
 
 interface AnalyticsDashboardProps {
@@ -158,22 +158,309 @@ export default function AnalyticsDashboard({
     })).sort((a,b) => b.count - a.count);
   }, [contracts]);
 
+  const handleExportAnalyticsPDF = () => {
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) {
+      alert('Could not open print preview.');
+      return;
+    }
+
+    // Classification Table Rows
+    const classRowsHtml = classificationChartData.map((item, idx) => {
+      const sharePct = stats.totalValue > 0 ? ((item.value / stats.totalValue) * 100).toFixed(1) : '0.0';
+      return `
+        <tr>
+          <td style="text-align: center; font-family: monospace;">${idx + 1}</td>
+          <td style="font-weight: bold;">${item.name}</td>
+          <td style="text-align: center; font-family: monospace;">${item.count} Works</td>
+          <td style="text-align: right; font-weight: bold; font-family: monospace;">${formatIndianCurrency(item.value)}</td>
+          <td style="text-align: center; font-family: monospace;">${sharePct}%</td>
+        </tr>
+      `;
+    }).join('');
+
+    // Section Table Rows
+    const sectionRowsHtml = sectionChartData.map((item, idx) => {
+      const gap = item.avgPhysical - item.avgFinancial;
+      const gapText = gap > 0 ? `+${gap.toFixed(1)}%` : `${gap.toFixed(1)}%`;
+      const gapColor = gap >= 15 ? '#b91c1c' : gap > 0 ? '#b45309' : '#15803d';
+      const gapWeight = gap >= 15 ? 'bold' : 'normal';
+
+      return `
+        <tr>
+          <td style="text-align: center; font-family: monospace;">${idx + 1}</td>
+          <td style="font-weight: bold; text-align: center;">${item.name}</td>
+          <td style="text-align: center; font-family: monospace;">${item.count} Works</td>
+          <td style="text-align: right; font-family: monospace;">${formatIndianCurrency(item.totalValue)}</td>
+          <td style="text-align: center; font-family: monospace; color: #0d9488; font-weight: bold;">${item.avgPhysical.toFixed(1)}%</td>
+          <td style="text-align: center; font-family: monospace; color: #2563eb; font-weight: bold;">${item.avgFinancial.toFixed(1)}%</td>
+          <td style="text-align: center; font-family: monospace; color: ${gapColor}; font-weight: ${gapWeight};">${gapText}</td>
+        </tr>
+      `;
+    }).join('');
+
+    // Supervisor Table Rows
+    const supervisorRowsHtml = supervisorChartData.map((item, idx) => {
+      return `
+        <tr>
+          <td style="text-align: center; font-family: monospace;">${idx + 1}</td>
+          <td style="font-weight: bold;">${item.name}</td>
+          <td style="text-align: center; font-family: monospace;">${item.count} Works</td>
+          <td style="text-align: right; font-family: monospace; font-weight: bold;">${formatIndianCurrency(item.totalValue)}</td>
+          <td style="text-align: center; font-family: monospace; color: #16a34a; font-weight: bold;">${item.completedCount} / ${item.count}</td>
+          <td style="text-align: center; font-family: monospace; color: #0f766e; font-weight: bold;">${item.avgPhy}%</td>
+        </tr>
+      `;
+    }).join('');
+
+    // Critical Gaps Rows
+    const bottleneckRowsHtml = stats.bottlenecksList.map((c, idx) => {
+      const gap = c.physicalProgressNumeric - c.financialProgressNumeric;
+      return `
+        <tr>
+          <td style="text-align: center; font-family: monospace;">${idx + 1}</td>
+          <td style="font-weight: bold;">[${c.section}] ${c.workName}</td>
+          <td>${c.supervisor}</td>
+          <td style="text-align: right; font-family: monospace;">${c.totalContractValue}</td>
+          <td style="text-align: center; font-family: monospace; color: #0d9488;">${c.physicalProgress}</td>
+          <td style="text-align: center; font-family: monospace; color: #2563eb;">${c.financialProgress}</td>
+          <td style="text-align: center; font-family: monospace; color: #b91c1c; font-weight: bold;">+${gap.toFixed(0)}%</td>
+          <td style="color: #475569; font-size: 8px;">${c.pendingBillStatus || 'Pending Joint Sign-off'}</td>
+        </tr>
+      `;
+    }).join('');
+
+    const analyticReportContent = `
+      <html>
+        <head>
+          <title>ELS-KYN INTERACTIVE ANALYTICS SUMMARY REPORT</title>
+          <style>
+            body { font-family: Arial, sans-serif; margin: 25px; color: #0f172a; font-size: 9px; background-color: #fff; }
+            .hdr { text-align: center; font-family: "Times New Roman", Times, serif; font-size: 15px; font-weight: bold; text-transform: uppercase; margin-bottom: 2px; }
+            .subhdr { text-align: center; font-size: 8.5px; color: #475569; margin-bottom: 2px; letter-spacing: 0.5px; }
+            .subhdr-bold { text-align: center; font-size: 9.5px; font-weight: bold; margin-bottom: 10px; }
+            .divider { border-top: 1.5px solid #000; margin-bottom: 12px; }
+            .title-box { background-color: #f1f5f9; text-align: center; padding: 8px; font-weight: bold; font-size: 11px; border: 1.5px solid #cbd5e1; border-radius: 6px; margin-bottom: 12px; text-transform: uppercase; }
+            
+            .meta-section { display: flex; justify-content: space-between; border: 1px dashed #94a3b8; background-color: #f8fafc; padding: 8px; border-radius: 6px; margin-bottom: 12px; }
+            .meta-item { line-height: 1.4; }
+
+            .stats-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 12px; }
+            .stat-card { border: 1.5px solid #cbd5e1; border-radius: 6px; padding: 8px; text-align: center; background-color: #f8fafc; }
+            .stat-title { font-size: 7.5px; font-weight: bold; color: #475569; text-transform: uppercase; margin-bottom: 3px; }
+            .stat-value { font-size: 12px; font-weight: bold; font-family: monospace; color: #0f172a; }
+
+            h3 { font-size: 10px; font-weight: bold; text-transform: uppercase; margin: 12px 0 5px 0; color: #0f172a; border-left: 3px solid #0f766e; padding-left: 6px; }
+            .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+
+            .report-table { width: 100%; border-collapse: collapse; margin-bottom: 10px; }
+            .report-table th { background-color: #0f172a; color: #ffffff; padding: 4px 5px; font-size: 7.5px; font-weight: bold; text-transform: uppercase; text-align: left; border: 1px solid #cbd5e1; }
+            .report-table td { padding: 4px 5px; border: 1px solid #cbd5e1; font-size: 7.5px; vertical-align: middle; }
+            .report-table tr:nth-child(even) { background-color: #fcfcfc; }
+
+            .footer-sig { margin-top: 20px; font-size: 8px; page-break-inside: avoid; }
+            
+            @media print {
+              body { margin: 12px; }
+              @page { size: A4 portrait; margin: 0.8cm; }
+            }
+          </style>
+        </head>
+        <body>
+          <div class="hdr">Central Railway</div>
+          <div class="subhdr">Office of the Senior Divisional Electrical Engineer (TRS)</div>
+          <div class="subhdr-bold">Electric Loco Shed, Kalyan (Mumbai Division)</div>
+          <div class="divider"></div>
+
+          <div class="title-box">
+            ELS/KYN CONTRACTS — INTERACTIVE ANALYTICS COMPACT EXECUTIVE REPORT
+          </div>
+
+          <div class="meta-section">
+            <div class="meta-item">
+              <strong>Audit Period:</strong> Financial Year 2026/27<br>
+              <strong>Data Source:</strong> Live Local Sheets Dataset
+            </div>
+            <div class="meta-item" style="text-align: right;">
+              <strong>Date of Generation:</strong> ${new Date().toLocaleString()}<br>
+              <strong>Classification:</strong> HIGHLY CONFIDENTIAL (ELS/KYN Admin Only)
+            </div>
+          </div>
+
+          <div class="stats-row">
+            <div class="stat-card">
+              <div class="stat-title">Total Active Portfolio Value</div>
+              <div class="stat-value" style="color: #0d9488;">${formatIndianCurrency(stats.totalValue)}</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-title">Technical Classification Mix</div>
+              <div class="stat-value">${classificationChartData.length} Designations</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-title">Risk Alerts (&ge;15% Progress Lag)</div>
+              <div class="stat-value" style="color: #b91c1c;">${stats.bottlenecksCount} Works Gaps</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-title">Completed Works Ratio</div>
+              <div class="stat-value" style="color: #2563eb;">${stats.completedCount} / ${stats.totalCount} Works</div>
+            </div>
+          </div>
+
+          <div class="grid-2">
+            <div>
+              <h3>1. Technical Classification Value Breakdown</h3>
+              <table class="report-table">
+                <thead>
+                  <tr>
+                    <th style="width: 20px; text-align: center;">S.N</th>
+                    <th>Classification Type</th>
+                    <th style="width: 50px; text-align: center;">Contracts</th>
+                    <th style="width: 80px; text-align: right;">Total Budget</th>
+                    <th style="width: 40px; text-align: center;">Share%</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${classRowsHtml}
+                </tbody>
+              </table>
+            </div>
+
+            <div>
+              <h3>2. Section-wise Performance metrics</h3>
+              <table class="report-table">
+                <thead>
+                  <tr>
+                    <th style="width: 20px; text-align: center;">S.N</th>
+                    <th style="text-align: center; width: 35px;">Section</th>
+                    <th style="width: 45px; text-align: center;">Contracts</th>
+                    <th style="text-align: right; width: 75px;">Allocated Budget</th>
+                    <th style="text-align: center; width: 35px;">Avg Phy%</th>
+                    <th style="text-align: center; width: 35px;">Avg Fin%</th>
+                    <th style="text-align: center; width: 35px;">Gap Ratio</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${sectionRowsHtml}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="grid-2">
+            <div>
+              <h3>3. Supervisor Monitoring Workloads</h3>
+              <table class="report-table">
+                <thead>
+                  <tr>
+                    <th style="width: 20px; text-align: center;">S.N</th>
+                    <th>Supervisor Title</th>
+                    <th style="width: 50px; text-align: center;">Works</th>
+                    <th style="width: 85px; text-align: right;">Valuation</th>
+                    <th style="width: 55px; text-align: center;">Comp Rate</th>
+                    <th style="width: 45px; text-align: center;">Avg Progress</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${supervisorRowsHtml}
+                </tbody>
+              </table>
+            </div>
+
+            <div>
+              <h3>4. Executive Risk Insight Brief</h3>
+              <div style="background-color: #fafafa; border: 1px solid #cbd5e1; border-radius: 6px; padding: 8px; line-height: 1.4; color: #334155; font-size: 7.5px;">
+                <p style="margin: 0 0 5px 0; font-weight: bold; color: #0f172a; font-size: 8px;">📈 KEY DECISION RECOMMENDATIONS:</p>
+                <p style="margin: 0 0 4px 0;"><strong>Unified Billing Alignment:</strong> The total outstanding financial exposure from progress margins requires SSE/Works physical measurement updates within this fiscal cycle.</p>
+                <p style="margin: 0 0 4px 0;"><strong>Supervisor Workload balancing:</strong> Supervisors managing higher workload sums should be prioritized for fast-tracked billing preparation to sync clearances.</p>
+                <p style="margin: 0;"><strong>Active Sections:</strong> PEX and renovation sections occupy the major chunk of CAMC budget allocation. Strict SLA parameters are recommended.</p>
+              </div>
+            </div>
+          </div>
+
+          <h3>5. Top Critical Billing Bottlenecks (Outstanding Gaps)</h3>
+          <table class="report-table" style="margin-bottom: 5px;">
+            <thead>
+              <tr>
+                <th style="width: 20px; text-align: center;">S.N</th>
+                <th>Contract Description</th>
+                <th style="width: 85px;">Supervisor</th>
+                <th style="width: 80px; text-align: right;">Valuation</th>
+                <th style="width: 45px; text-align: center;">Physical%</th>
+                <th style="width: 45px; text-align: center;">Financial%</th>
+                <th style="width: 45px; text-align: center;">Gap %</th>
+                <th style="width: 120px;">Hurdle / Remark</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${bottleneckRowsHtml.length > 0 ? bottleneckRowsHtml : '<tr><td colspan="8" style="text-align:center;">No major progress-billing gaps logged.</td></tr>'}
+            </tbody>
+          </table>
+
+          <div class="footer-sig">
+            <table style="width: 100%; border-collapse: collapse;">
+              <tr>
+                <td style="width: 50%; font-size: 8.5px; color: #b91c1c; font-weight: bold; vertical-align: bottom; font-family: Arial, sans-serif;">
+                  * Highly Confidential Report only to be shared within ELS/KYN Administration.
+                </td>
+                <td style="text-align: right; width: 50%;">
+                  <div style="font-weight: bold; font-size: 9px;">Central Railway • Electric Loco Shed, Kalyan</div>
+                  <div style="font-size: 8.5px; color: #333; margin-top: 3px; font-weight: bold;">Senior Section Engineer (Works) / SSE / ELS-KYN</div>
+                  <div style="font-size: 7.5px; color: #555; margin-top: 1px;">Office of Senior Divisional Electrical Engineer (TRS)</div>
+                </td>
+              </tr>
+            </table>
+          </div>
+
+          <script>
+            window.onload = function() {
+              setTimeout(function() {
+                window.print();
+              }, 500);
+            };
+          </script>
+        </body>
+      </html>
+    `;
+
+    printWindow.document.write(analyticReportContent);
+    printWindow.document.close();
+  };
+
   // Chart Colors presets
   const COLORS = ['#0f766e', '#6d28d9', '#1d4ed8', '#b45309', '#be185d', '#0369a1', '#15803d', '#475569'];
 
   return (
     <div className="space-y-6">
+      {/* Executive Quick Actions */}
+      <div className="flex flex-col sm:flex-row items-center justify-between gap-3 bg-white dark:bg-slate-900 p-4 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-xs no-print">
+        <div>
+          <h2 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
+            <BarChart2 className="w-4.5 h-4.5 text-teal-600" />
+            Executive Analytics Summary
+          </h2>
+          <p className="text-[10px] text-slate-500 dark:text-slate-400">Live technical progress, supervisor workloads, and billing risk profiling</p>
+        </div>
+        <button
+          onClick={handleExportAnalyticsPDF}
+          className="bg-indigo-600 hover:bg-indigo-700 text-white text-xxs font-bold px-4 py-2 rounded-xl flex items-center gap-2 shadow-sm transition-all cursor-pointer border border-transparent self-stretch sm:self-auto justify-center"
+          title="Export high-density compact executive analytics dashboard as printable PDF"
+        >
+          <Printer className="w-3.5 h-3.5 text-indigo-100" />
+          Export Analytics PDF
+        </button>
+      </div>
+
       {/* KPI Top Summary Row */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-slate-900 border border-slate-850 text-white rounded-2xl shadow-sm p-5 relative overflow-hidden group">
-          <div className="absolute right-0 bottom-0 translate-x-3 translate-y-3 opacity-10 text-white group-hover:scale-110 transition-transform">
+        <div className="bg-gradient-to-br from-teal-50/60 to-white dark:from-slate-900/40 dark:to-slate-950/60 border border-teal-100 dark:border-slate-800/80 text-slate-800 dark:text-white rounded-2xl shadow-xs p-5 relative overflow-hidden group">
+          <div className="absolute right-0 bottom-0 translate-x-3 translate-y-3 opacity-15 dark:opacity-10 text-teal-600 dark:text-teal-400 group-hover:scale-110 transition-transform">
             <IndianRupee className="w-28 h-28" />
           </div>
-          <p className="text-slate-400 text-xxs font-semibold uppercase tracking-wider">Total Active Value</p>
-          <p className="text-2xl font-bold font-sans tracking-tight mt-1 text-teal-400">
+          <p className="text-slate-500 dark:text-slate-400 text-xxs font-semibold uppercase tracking-wider">Total Active Value</p>
+          <p className="text-2xl font-bold font-sans tracking-tight mt-1 text-teal-600 dark:text-teal-400">
             {formatIndianCurrency(stats.totalValue)}
           </p>
-          <div className="flex items-center gap-2 mt-2 text-slate-450 text-xxs font-mono">
+          <div className="flex items-center gap-2 mt-2 text-slate-500 dark:text-slate-400 text-xxs font-mono">
             <span>Across {stats.totalCount} active contracts</span>
           </div>
         </div>
