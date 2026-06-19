@@ -10,7 +10,7 @@ import BillingMatrix from './components/BillingMatrix';
 import ControlMatrix from './components/ControlMatrix';
 
 import {
-  FileCheck2, SlidersHorizontal, Table, LineChart, Cpu, Calendar, Database,
+  FileCheck2, SlidersHorizontal, Table, LineChart, Cpu, Calendar, Database, 
   HelpCircle, RefreshCw, Layers, ArrowUpRight, ShieldCheck, Mail, Receipt,
   Sun, Moon, Printer, ShieldAlert
 } from 'lucide-react';
@@ -47,6 +47,55 @@ export default function App() {
     return sessionStorage.getItem('kyn_unlocked') === 'true';
   });
 
+  // Live Auto-Sync states
+  const [autoSyncState, setAutoSyncState] = useState<'idle' | 'syncing' | 'success' | 'failed'>('idle');
+  const [autoSyncDetails, setAutoSyncDetails] = useState('');
+
+  const triggerBackgroundAutoSync = async (sheetId: string, sheetName: string) => {
+    setAutoSyncState('syncing');
+    setAutoSyncDetails(`Quick checking Google Sheet: ${sheetName}...`);
+
+    try {
+      const csvEndpoint = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(sheetName)}`;
+      const response = await fetch(csvEndpoint);
+      
+      if (!response.ok) {
+        throw new Error('Google Sheets return error status.');
+      }
+
+      const csvText = await response.text();
+      if (!csvText || csvText.length < 50) {
+        throw new Error('Empty spreadsheet content.');
+      }
+
+      const parsedRows = parseFullCSV(csvText);
+      const convertedContracts = convertCSVRowsToContracts(parsedRows);
+
+      if (convertedContracts.length === 0) {
+        throw new Error('Empty parsed output.');
+      }
+
+      // Sync successful!
+      setContracts(convertedContracts);
+      setSourceName(`Google Sheet: ${sheetName}`);
+      localStorage.setItem('kyn_contracts_data', JSON.stringify(convertedContracts));
+      localStorage.setItem('kyn_contracts_source', `Google Sheet: ${sheetName}`);
+      
+      setAutoSyncState('success');
+      setAutoSyncDetails(`Updated from Google Sheet! Parsed ${convertedContracts.length} rows.`);
+      setTimeout(() => {
+        setAutoSyncState('idle');
+      }, 5500);
+    } catch (err: any) {
+      console.warn('Background auto-sync failed safely:', err);
+      setAutoSyncState('failed');
+      setAutoSyncDetails('No network or permission error. Using offline cached data.');
+      setTimeout(() => {
+        setAutoSyncState('idle');
+      }, 7000);
+    }
+  };
+
   const handlePasscodeSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (passcodeAttempt === SECURITY_PASSCODE) {
@@ -80,10 +129,16 @@ export default function App() {
 
   // Load contracts from LocalStorage if they exist, else write initial parsed CSV
   useEffect(() => {
+    let sheetId = '';
+    let sheetName = 'Sheet1';
+
     try {
+      sheetId = localStorage.getItem('kyn_autosync_sheet_id') || '';
+      sheetName = localStorage.getItem('kyn_autosync_sheet_name') || 'Sheet1';
+
       const storedData = localStorage.getItem('kyn_contracts_data');
       const storedSource = localStorage.getItem('kyn_contracts_source');
-
+      
       if (storedData) {
         const parsed: Contract[] = JSON.parse(storedData);
         // Refresh classifications to prevent cached stale/duplicate types
@@ -107,6 +162,11 @@ export default function App() {
       const rows = parseFullCSV(defaultRawCSV);
       setContracts(convertCSVRowsToContracts(rows));
     }
+
+    // Fire automatic background fetch to keep the app "live" from the user's Sheet
+    if (sheetId) {
+      triggerBackgroundAutoSync(sheetId, sheetName);
+    }
   }, []);
 
   const handleDataLoaded = (newContracts: Contract[], source: string) => {
@@ -126,6 +186,12 @@ export default function App() {
       setSourceName('Default KYN Shed Records');
       localStorage.setItem('kyn_contracts_data', JSON.stringify(parsed));
       localStorage.setItem('kyn_contracts_source', 'Default KYN Shed Records');
+      
+      // Wipe the auto-sync configuration block
+      localStorage.removeItem('kyn_autosync_sheet_id');
+      localStorage.removeItem('kyn_autosync_sheet_name');
+      localStorage.removeItem('kyn_autosync_sheet_url');
+
       setFilters(INITIAL_FILTERS);
     }
   };
@@ -215,7 +281,7 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-850 dark:text-slate-100 transition-all font-sans antialiased text-xs selection:bg-teal-150 selection:text-teal-900">
-
+      
       {/* Top Professional Executive Banner */}
       <header className="bg-slate-900 text-white shadow-md border-b border-slate-800 no-print">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5">
@@ -232,11 +298,31 @@ export default function App() {
               <h1 className="text-xl sm:text-2xl font-bold tracking-tight font-sans mt-1">
                 CAMC & Material Contracts Live Controller
               </h1>
-              <p className="text-slate-400 text-xxs mt-1 flex items-center gap-2">
+              <div className="text-slate-400 text-xxs mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1.5">
                 <span>Spreadsheet Integration: <strong className="text-emerald-400 font-medium">{sourceName}</strong></span>
                 <span>•</span>
                 <span>Contracts count: <strong className="text-white">{contracts.length} records</strong></span>
-              </p>
+                
+                {/* Auto-Sync active status indicator */}
+                {autoSyncState === 'syncing' && (
+                  <span className="inline-flex items-center gap-1 bg-amber-500/10 text-amber-300 border border-amber-500/20 px-2 py-0.5 rounded-full font-mono text-[9px] animate-pulse">
+                    <span className="h-1 text-amber-400 animate-spin">⚡</span>
+                    {autoSyncDetails || 'Auto-syncing Sheet...'}
+                  </span>
+                )}
+                {autoSyncState === 'success' && (
+                  <span className="inline-flex items-center gap-1 bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2 py-0.5 rounded-full font-mono text-[9px]">
+                    <span className="h-1 text-emerald-400 font-bold">✓</span>
+                    {autoSyncDetails || 'Live sync success!'}
+                  </span>
+                )}
+                {autoSyncState === 'failed' && (
+                  <span className="inline-flex items-center gap-1 bg-red-500/15 text-red-300 border border-red-500/25 px-2 py-0.5 rounded-full font-mono text-[9px]" title={autoSyncDetails}>
+                    <span>⚠️</span>
+                    <span>Cached data</span>
+                  </span>
+                )}
+              </div>
             </div>
 
             {/* Header Right Controllers */}
@@ -295,8 +381,8 @@ export default function App() {
                 ℹ️ <strong>Heads up:</strong> Since this app runs in a sandboxed preview frame, some web browsers block print dialog commands from triggering inside the frame, or truncate content.
                 For a perfect, full-width, clean vector PDF printout, please click the <strong>"Open in new tab"</strong> button in the top-right corner of the player header first, then export there!
               </p>
-              <button
-                onClick={() => setShowPrintNotice(false)}
+              <button 
+                onClick={() => setShowPrintNotice(false)} 
                 className="text-blue-600 dark:text-blue-400 hover:underline text-[10px] font-bold cursor-pointer pt-0.5 block"
               >
                 Dismiss Notice
@@ -308,14 +394,14 @@ export default function App() {
 
       {/* Main Container Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
-
+        
         {/* Animated Google Sheets Sync Center Section */}
         {showSyncPanel && (
           <div className="animate-in fade-in slide-in-from-top-4 duration-300">
-            <SheetsSync
-              onDataLoaded={handleDataLoaded}
-              currentSource={sourceName}
-              rowCount={contracts.length}
+            <SheetsSync 
+              onDataLoaded={handleDataLoaded} 
+              currentSource={sourceName} 
+              rowCount={contracts.length} 
             />
           </div>
         )}
@@ -375,8 +461,8 @@ export default function App() {
               {filters.classificationType !== 'All' && <span className="bg-white border border-teal-200 px-2.5 py-1 rounded-lg">Type: <strong className="text-teal-955">{filters.classificationType}</strong></span>}
               {filters.workStatus !== 'All' && <span className="bg-white border border-teal-200 px-2.5 py-1 rounded-lg">Status: <strong className="text-teal-955">{filters.workStatus}</strong></span>}
             </div>
-
-            <button
+            
+            <button 
               onClick={handleClearFilters}
               className="text-xxs px-2.5 py-1 hover:bg-teal-100 rounded-lg text-teal-800 font-bold border border-teal-200 transition-colors cursor-pointer"
             >
@@ -407,7 +493,7 @@ export default function App() {
               />
             </div>
           ) : currentTab === 'billing' ? (
-            <BillingMatrix
+            <BillingMatrix 
               contracts={contracts}
               onSelectContract={setSelectedContract}
               darkMode={darkMode}
@@ -424,9 +510,9 @@ export default function App() {
       </main>
 
       {/* Slide briefings detailing popups */}
-      <ContractDetails
-        contract={selectedContract}
-        onClose={() => setSelectedContract(null)}
+      <ContractDetails 
+        contract={selectedContract} 
+        onClose={() => setSelectedContract(null)} 
       />
 
       <footer className="bg-white border-t border-slate-100 text-slate-400 py-8 text-center text-xxs font-mono mt-12">

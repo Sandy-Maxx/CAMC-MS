@@ -10,9 +10,9 @@ interface SheetsSyncProps {
 }
 
 export default function SheetsSync({ onDataLoaded, currentSource, rowCount }: SheetsSyncProps) {
-  const [sheetUrl, setSheetUrl] = useState('');
-  const [spreadsheetId, setSpreadsheetId] = useState('');
-  const [sheetName, setSheetName] = useState('Sheet1');
+  const [sheetUrl, setSheetUrl] = useState(() => localStorage.getItem('kyn_autosync_sheet_url') || '');
+  const [spreadsheetId, setSpreadsheetId] = useState(() => localStorage.getItem('kyn_autosync_sheet_id') || '');
+  const [sheetName, setSheetName] = useState(() => localStorage.getItem('kyn_autosync_sheet_name') || 'Sheet1');
   const [rawPaste, setRawPaste] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -62,6 +62,11 @@ export default function SheetsSync({ onDataLoaded, currentSource, rowCount }: Sh
       if (convertedContracts.length === 0) {
         throw new Error('No valid contract rows could be parsed from this Google Sheet structure. Ensure column headers match.');
       }
+
+      // Save sync parameters to enable on-load background auto-updates
+      localStorage.setItem('kyn_autosync_sheet_id', targetId);
+      localStorage.setItem('kyn_autosync_sheet_name', sheetName);
+      localStorage.setItem('kyn_autosync_sheet_url', sheetUrl);
 
       onDataLoaded(convertedContracts, `Google Sheet: ${sheetName}`);
       setSuccessMsg(`Successfully loaded ${convertedContracts.length} contract works live from Google Sheet!`);
